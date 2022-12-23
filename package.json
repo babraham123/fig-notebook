@@ -1,0 +1,21 @@
+{
+  "name": "Fig Notebook",
+  "version": "1.0.0",
+  "description": "Javascript code notebook in Figjam",
+  "scripts": {
+    "test": "tsc -p src --noEmit",
+    "build": "esbuild src/code.tsx --bundle --outfile=dist/code.js",
+    "dev": "concurrently -n tsc,build 'npm run test -- --preserveWatchOutput --watch' 'npm run build -- --watch'"
+  },
+  "author": "Bereket Abraham",
+  "license": "MIT License",
+  "dependencies": {
+    "typescript": "^4.3.5"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.49.0",
+    "@figma/widget-typings": "^1.4.0",
+    "concurrently": "^6.4.0",
+    "esbuild": "^0.13.15"
+  }
+}
