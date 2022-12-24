@@ -3,8 +3,12 @@
   "id": "",
   "api": "1.0.0",
   "editorType": ["figma", "figjam"],
-  "permissions": [],
+  "permissions": ["currentuser"],
   "containsWidget": true,
-  "main": "dist/code.js",
-  "widgetApi": "1.0.0"
+  "main": "dist/widget.js",
+  "widgetApi": "1.0.0",
+  "ui": {
+    "run": "dist/run/index.html",
+    "editor": "dist/editor/index.html"
+  }
 }

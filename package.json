@@ -1,21 +1,39 @@
 {
-  "name": "Fig Notebook",
+  "name": "fig-notebook",
   "version": "1.0.0",
   "description": "Javascript code notebook in Figjam",
-  "scripts": {
-    "test": "tsc -p src --noEmit",
-    "build": "esbuild src/code.tsx --bundle --outfile=dist/code.js",
-    "dev": "concurrently -n tsc,build 'npm run test -- --preserveWatchOutput --watch' 'npm run build -- --watch'"
-  },
-  "author": "Bereket Abraham",
+  "main": "dist/widget.js",
+  "type": "module",
+  "author": "Bereket Abraham <babraham42@gmail.com>",
   "license": "MIT License",
+  "scripts": {
+    "build": "concurrently 'npm:build-iframe-editor' 'npm:build-iframe-run' 'npm:build-widget'",
+    "watch": "watch 'npm run build' ./src",
+    "build-iframe-run": "env VITE_TARGET=run vite build",
+    "build-iframe-editor": "env VITE_TARGET=editor vite build",
+    "build-widget": "esbuild src/widget.ts --bundle --outfile=dist/widget.js --tsconfig=src/widget/tsconfig.json && sed -i .bak 's/import(/imprt(/g' dist/widget.js",
+    "test": "tsc -p src --noEmit"
+  },
   "dependencies": {
-    "typescript": "^4.3.5"
+    "@create-figma-plugin/ui": "^2.0.0-alpha.1",
+    "blueimp-md5": "^2.19.0",
+    "css-selector-parser": "^1.4.1",
+    "preact": "^10.7.3",
+    "prettier": "^2.6.2",
+    "pretty-format": "^28.1.1"
   },
   "devDependencies": {
-    "@figma/plugin-typings": "^1.49.0",
-    "@figma/widget-typings": "^1.4.0",
-    "concurrently": "^6.4.0",
-    "esbuild": "^0.13.15"
+    "@create-figma-plugin/build": "^2.0.0-alpha.1",
+    "@figma/plugin-typings": "*",
+    "@figma/widget-typings": "*",
+    "@types/estree": "^0.0.51",
+    "@types/blueimp-md5": "^2.18.0",
+    "@types/prettier": "^2.6.1",
+    "concurrently": "^7.2.1",
+    "esbuild": "^0.14.39",
+    "typescript": "^4.3.5",
+    "vite": "^2.9.9",
+    "vite-plugin-singlefile": "^0.9.0",
+    "watch": "^0.13.0"
   }
 }

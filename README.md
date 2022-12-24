@@ -2,7 +2,7 @@ Fig Notebook
 ===
 Javascript code notebooks in Figjam.
 
-I build upon the work done by previous widgets, mainly Michael Bullington's Code Notebooks and Cameron Yick's p5.js Pad.
+I build upon the work done by previous widgets, mainly Michael Bullington\'s Code Notebooks and Cameron Yick\'s p5.js Pad.
 
 ### Importing your widget
 1. "Import widget from manifest"
