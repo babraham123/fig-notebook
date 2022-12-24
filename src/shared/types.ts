@@ -1,5 +1,5 @@
 /**
- * Used by both widget and iframe
+ * Used by both widget and iframe modules
  */
 
 export type ObjType = "TEXT" | "JSON" | "CSV" | "SVG" | "BINARY" | "ERROR" | "UNDEFINED";
@@ -25,11 +25,13 @@ export interface ErrorLike {
 export interface Result {
   output: Obj;
   inputsHash: string;
-  display?: Obj;
+  codeHash: string;
 }
 
+export type Language = "JS" | "PY";
+
 export interface Code {
-  language: string;
+  language: Language;
   code: string;
   testCode: string;
 }
@@ -39,13 +41,14 @@ export interface NodeQuery {
   id?: string;
 }
 
-export type StatusType = "READY";
+export type StatusType = "READY" | "SUCCESS" | "FAILURE";
 
-export type CommandType = "RUN" | "FORMAT" | "TEST" | "QUERY" | "INTROSPECT";
+export type CommandType = "STATUS" | "SAVE" | "RUN" | "FORMAT" | "TEST" | "QUERY";
+// future: "INTROSPECT"
 
 export interface IFrameMessage {
+  type: CommandType;
   status?: StatusType;
-  command?: CommandType;
   code?: Code;
   inputs?: Obj[];
   result?: Result;

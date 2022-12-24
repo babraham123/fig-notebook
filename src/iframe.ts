@@ -1,17 +1,30 @@
-import * as std from "./iframe/std";
+import md5 from "blueimp-md5";
 import { format } from "prettier";
 // import { loadPyodide } from 'https://pyodide-cdn2.iodide.io/v0.20.0/full/pyodide.mjs';
 
-import { createErrorMessage } from "./iframe/errors";
+import * as std from "./iframe/std";
 import { runScript } from "./iframe/runtime";
-import { sendMessage, buildMessageHandler, svgToString } from "./iframe/utils";
-
+import { svgToString } from "./iframe/utils";
 import { parseAST } from "./iframe/parse_ast";
-
-import { ScriptResult, IFrameMessages } from "./shared/types";
+import { Result, IFrameMessage, CommandType, Obj } from "./shared/types";
 import { bundleBodyAndModules } from "./iframe/bundler";
 import { noop } from "./shared/utils";
 import { runIntrospection } from "./iframe/introspection/run_introspection";
+
+// import.meta.env.VITE_TARGET
+const SUPPORTED_MSGS: Record<string, CommandType[]> = {
+  editor: ["RUN", "FORMAT", "TEST", "QUERY", "SAVE"],
+  run: ["RUN", "TEST"],
+};
+
+const HANDLERS: Record<CommandType, (msg: IFrameMessage) => Promise<void>> = {
+  STATUS: unsupportedHandler,
+  SAVE: saveHandler,
+  RUN: runHandler,
+  FORMAT: formatHandler,
+  TEST: unsupportedHandler,
+  QUERY: unsupportedHandler,
+};
 
 // Setup for running the script below.
 async function sendRunSuccess(result: ScriptResult) {
@@ -44,7 +57,63 @@ async function sendRunSuccess(result: ScriptResult) {
   }
 }
 
-async function runHandler({ code, modules, unitTests }: IFrameMessages["run"]) {
+function sendError(err: any, type: CommandType, inputsHash: string, codeHash: string) {
+  parent.postMessage({ type, result: {
+    output: {
+      type: "ERROR",
+      data: `${err}` + ("stack" in err && err.stack) ? `\n${err.stack}` : "",
+    },
+    inputsHash,
+    codeHash,
+  }}, "*");
+}
+
+async function unsupportedHandler(msg: IFrameMessage) {
+  console.warn(`In iframe ${import.meta.env.VITE_TARGET} command ${msg.type} is unsupported`);
+}
+
+async function runHandler(msg: IFrameMessage) {
+  let inputsHash = "";
+  for (const input of msg.inputs ?? []) {
+    inputsHash += md5(input);
+  }
+  if (!msg.code) {
+    sendError("No code found", "RUN", inputsHash, "");
+  }
+  const codeHash = md5(`${msg.code.language}:::${msg.code.code}`);
+
+  try {
+    let output: Obj | undefined;
+    switch (msg.code.language) {
+      case "JS":
+        output = await runJSHandler(msg);
+        break;
+      case "PY":
+        output = await runPYHandler(msg);
+        break;
+      default:
+        sendError(`Unsupported language: ${msg.code.language}`, "RUN", inputsHash, codeHash);
+        return;
+    }
+    parent.postMessage({ type: "RUN", result: {
+      output,
+      inputsHash,
+      codeHash,
+    }}, "*");
+  } catch (err: any) {
+    sendError(err, "RUN", inputsHash, codeHash);
+  }
+}
+
+async function runJSHandler(msg: IFrameMessage): Promise<Obj> {
+  console.warn("Implement");
+}
+
+async function runPYHandler(msg: IFrameMessage): Promise<Obj> {
+  console.warn("Implement");
+}
+
+async function runHandlerOld(msg: IFrameMessage) {
   try {
     const { bundledModules, bundledBody, lastStatement } = bundleBodyAndModules(
       code,
@@ -107,7 +176,7 @@ async function runHandler({ code, modules, unitTests }: IFrameMessages["run"]) {
 //   }
 // }
 
-async function formatHandler(code: IFrameMessages["format"]) {
+async function formatHandler(msg: IFrameMessage) {
   try {
     const ast = parseAST(code);
     const formattedCode = format(code, {
@@ -121,42 +190,24 @@ async function formatHandler(code: IFrameMessages["format"]) {
   }
 }
 
-async function introspectionHandler({
-  code,
-  modules,
-}: IFrameMessages["introspection"]) {
-  try {
-    const { bundledModules, bundledBody, lastStatement, symbols } =
-      bundleBodyAndModules(code, modules, true);
-
-    /**
-     * This statement turns ['a', 'b'] into { a, b }.
-     */
-    const fakeLastStatement = "{" + [...symbols].join(", ") + "}";
-    const { lastStatement: symbolValueMap } = await runScript(
-      bundledModules,
-      bundledBody,
-      fakeLastStatement,
-      std,
-      []
-    );
-
-    runIntrospection(lastStatement, symbolValueMap);
-  } catch (err) {
-    sendMessage("runerror", {
-      errorLike: await createErrorMessage(err, code, modules),
-    });
+// Only handles response
+async function saveHandler(msg: IFrameMessage) {
+  if (msg.status === "SUCCESS") {
+    //
+  } else if (msg.status === "FAILURE") {
+    //
+  } else {
+    console.warn(`In command ${msg.type}, status ${msg.status} is unsupported`);
   }
 }
 
-window.onmessage = buildMessageHandler({
-  run: import.meta.env.VITE_TARGET === "run" ? runHandler : noop,
-  format: import.meta.env.VITE_TARGET === "format" ? formatHandler : noop,
-  introspection:
-    import.meta.env.VITE_TARGET === "introspection"
-      ? introspectionHandler
-      : noop,
-});
+window.onmessage = (event: MessageEvent) => {
+  if (event.data.type in SUPPORTED_MSGS[import.meta.env.VITE_TARGET]) {
+    HANDLERS[event.data.type](event.data);
+    return;
+  }
+  unsupportedHandler(event.data);
+};
 
 // Send 'ready' message to the plugin.
-sendMessage("ready");
+parent.postMessage({ type: "STATUS", status: "READY" }, "*");
