@@ -19,4 +19,13 @@ const config = defineConfig({
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Stub it out when not needed
+ if (process.env.VITE_TARGET !== "editor") {
+  config.resolve.alias["prettier"] = path.join(
+    dirname,
+    "build",
+    "fake-prettier.mjs"
+  );
+}
+
 export default config;

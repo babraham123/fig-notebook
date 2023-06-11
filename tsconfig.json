@@ -8,6 +8,7 @@
     "typeRoots": ["./node_modules/@types"],
     "moduleResolution": "Node",
     "module": "es2020",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true
   }
 }

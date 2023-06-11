@@ -1,90 +1,204 @@
-const { widget } = figma
-const { AutoLayout, SVG, Text, useSyncedState, usePropertyMenu } = widget
+import * as FigmaSelector from "./vendor/figma-selector";
 
-const buttonSrc = `
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="16" cy="16" r="15.5" stroke="black" stroke-opacity="0.1" fill="white"/>
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M17 8H15V15H8V17H15V24H17V17H24V15H17V8Z" fill="black" fill-opacity="0.8"/>
-  </svg>
-`
+import {
+  getPrevCodeBlock,
+  getPrevFrame,
+  insertCodeBlock,
+  insertFrame,
+  getNamedNodeModules,
+  serializeNode,
+  NamedCanvasNodeImports,
+  buildConnectors,
+  parseImportStatementsFromCode,
+  hashNodeIdToColorWithOpacity,
+} from "./utils";
 
-const downIconSrc = `
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M7.08 0.079998H9.08L9.08 12.08L14.58 6.58L16 8L8.08 15.92L0.160004 8L1.58 6.58L7.08 12.08L7.08 0.079998Z" fill="white"/>
-  </svg>
-`
 
-const upIconSrc = `
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M9.08001 15.92L7.08001 15.92L7.08001 3.92002L1.58001 9.42002L0.160007 8.00002L8.08001 0.0800171L16 8.00002L14.58 9.42002L9.08001 3.92002L9.08001 15.92Z" fill="white"/>
-  </svg>
-`
+import { EMPTY_OBJ, DEFAULT_CODE, DEFAULT_RESULT } from "../shared/constants";
+import { ObjType, IFrameMessage, Code, Result } from "../shared/types";
 
-function Counter() {
-  const [count, setCount] = useSyncedState('count', 0)
-  const propertyMenu: WidgetPropertyMenuItem[] = [
-    {
-      tooltip: 'Increment',
-      propertyName: 'increment',
-      itemType: 'action',
-      icon: upIconSrc,
-    },
-  ]
-  if (count > 0) {
-    propertyMenu.push({
-      tooltip: 'Decrement',
-      propertyName: 'decrement',
-      itemType: 'action',
-      icon: downIconSrc,
-    })
+type PropertyType = "EDIT" | "RUN" | "STOP";
+
+const { AutoLayout, Input, Text, Rectangle, SVG, Ellipse } = figma.widget;
+const { usePropertyMenu, useSyncedState, useWidgetId } = figma.widget;
+
+function Widget() {
+  const widgetId = useWidgetId();
+
+  const [code, setCode] = useSyncedState<Code>("code", DEFAULT_CODE);
+  const [running, setRunning] = useSyncedState("running", false);
+  const [result, setResult] = useSyncedState<Result>("result", DEFAULT_RESULT);
+  const [inputNodeIds, setInputNodeIds] = useSyncedState<string[]>("inputNodeIds", []);
+
+  function handleMsg(msg: IFrameMessage, resolveFunc: () => void) {
+    if (msg?.status) {
+      console.log(`iframe status: ${msg.status}`);
+    }
+    if (msg?.command) {
+      console.error(`Incorrectly sent a command from iframe: ${msg.command}`);
+    }
+    if (msg?.code) {
+      setCode(msg.code);
+    }
+    if (msg?.inputs) {
+      console.error(`Incorrectly sent inputs from iframe: ${msg.inputs[0].type}`);
+    }
+    if (msg?.result) {
+      setResult(msg.result);
+      setRunning(false);
+      // figma.notify("Notebook error: " + errorLike.message);
+      resolveFunc();
+    }
+    if (msg?.nodeQuery) {
+      const {selector, id} = msg.nodeQuery;
+      const rootNode = !id ? figma.currentPage : figma.getNodeById(id);
+      const nodes = FigmaSelector.parse(selector, rootNode);
+      const serializedNodes = nodes.map((node) => serializeNode(node));
+      figma.ui.postMessage({
+        nodes: serializedNodes,
+      });
+    }
+    if (msg?.nodes) {
+      console.error(`Incorrectly sent nodes from iframe: ${msg.nodes.length}`);
+    }
+    if (msg?.debug) {
+      console.log(msg.debug);
+    }
   }
 
-  usePropertyMenu(propertyMenu, ({ propertyName }) => {
-    if (propertyName === 'decrement') {
-      setCount(count - 1)
-    } else if (propertyName === 'increment') {
-      setCount(count + 1)
+  function handlePropertyMenu({ propertyName }: { propertyName: PropertyType }): Promise<void> {
+    if (propertyName === "STOP") {
+      setRunning(false);
+      figma.ui.close();
+      figma.closePlugin();
+      return;
     }
-  })
+
+    return new Promise<void>((resolve) => {
+      figma.ui.close();
+      figma.ui.onmessage = (msg) => {
+        if (msg.status === "READY") {
+          // Only send code after we're ready.
+          setRunning(true);
+          setLastRanBy(figma.currentUser.name);
+
+          // collect inputs
+
+          // Send commands
+          if (propertyName === "RUN") {
+            figma.ui.postMessage({ command: "RUN", code, inputs });
+          }
+        }
+        // handle responses
+        handleMsg(msg, resolve);
+      };
+
+      // Display results
+      let htmlStr = "";
+      let visible = false;
+      // size = [undefined, undefined];  // fullscreen?
+      if (propertyName === "EDIT") {
+        htmlStr = __uiFiles__.edit;
+        visible = true;
+      } else if (propertyName === "RUN") {
+        htmlStr = __uiFiles__.run;
+      }
+
+      figma.showUI(htmlStr, {
+        visible,
+        title: "Program module",
+      });
+    });
+  }
+
+  usePropertyMenu(
+    [
+      {
+        itemType: "action",
+        propertyName: !running ? "RUN" : "STOP",
+        tooltip: !running ? "Run code" : "Stop execution",
+        icon: !running ? icons.play : icons.stop,
+      },
+      {
+        itemType: "action",
+        propertyName: "EDIT",
+        tooltip: "Edit",
+      },
+    ],
+    handlePropertyMenu
+  );
 
   return (
     <AutoLayout
-      verticalAlignItems="center"
-      padding={{ left: 16, right: 8, top: 8, bottom: 8 }}
-      fill="#FFFFFF"
-      cornerRadius={8}
-      spacing={12}
-      stroke={{
-        type: 'solid',
-        color: '#123456',
-      }}
-      effect={{
-        type: 'drop-shadow',
-        color: { r: 0, g: 0, b: 0, a: 0.2 },
-        offset: { x: 0, y: 0 },
-        blur: 2,
-        spread: 2,
-      }}
+      direction="vertical"
+      cornerRadius={metrics.cornerRadius}
+      fill={colors.bg}
+      effect={shadows}
+      stroke={colors.stroke}
+      strokeWidth={1}
     >
-      <SVG
-        src={buttonSrc}
-        onClick={() => {
-          setCount(count + 1)
-        }}
-      />
-      <AutoLayout
-        verticalAlignItems="center"
-        height="hug-contents"
-        padding={{ left: 24, right: 24, top: 12, bottom: 12 }}
-        fill="#E6E6E6"
-        cornerRadius={8}
-      >
-        <Text fontSize={32} horizontalAlignText="center">
-          {count}
-        </Text>
-      </AutoLayout>
+      {Boolean(
+        lastEditedBy ||
+          <Rectangle width={1} height={metrics.padding} />}
+      {Boolean(lastRanBy) && (
+        <AutoLayout
+          padding={metrics.detailPadding}
+          fill={colors.bgDetail}
+          width={metrics.width}
+          verticalAlignItems="center"
+          spacing={metrics.padding}
+        >
+          <Text fill={colors.textDetail}>{`Last ran by ${lastRanBy}`}</Text>
+          <Rectangle width="fill-parent" height={1} />
+          {running && <Badge style={badges.running}>Running</Badge>}
+          {!running && !hasError && (
+            <Badge style={badges.successful}>Successful</Badge>
+          )}
+          {!running && hasError && (
+            <Button
+              style={toggleError ? buttons.errorOpen : buttons.error}
+              onClick={handleToggleError}
+            >
+              {toggleError ? "Hide error" : "Show error"}
+            </Button>
+          )}
+          <AutoLayout
+            fill={colors.bgDetail}
+            verticalAlignItems="center"
+            spacing={metrics.unitTestSpacing}
+          >
+            <SVG
+              src={icons.add.replace(
+                /white/g,
+                colors.textDetail
+              )}
+              onClick={() => {
+                addUnitTest()
+              }}
+              tooltip={"Add test case"}
+            />
+            <SVG
+              src={(!running ? icons.play : icons.stop).replace(
+                /white/g,
+                colors.textDetail
+              )}
+              onClick={() =>
+                handlePropertyMenu({
+                  propertyName: running ? "stopExecution" : "runCode",
+                })
+              }
+              tooltip={!running ? "Run code" : "Stop execution"}
+            />
+          </AutoLayout>
+        </AutoLayout>
+      )}
+      {hasError && toggleError && (
+        <AutoLayout padding={metrics.padding} fill={colors.bgError}>
+          <ErrorStack error={lastRanError} />
+        </AutoLayout>
+      )}
     </AutoLayout>
-  )
+  );
 }
 
-widget.register(Counter)
+figma.widget.register(Widget);
