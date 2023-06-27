@@ -1,11 +1,20 @@
 import md5 from "blueimp-md5";
 import { ErrorLike } from "../shared/types";
+import { print as subPrint, printErr as subPrintErr } from '../shared/utils';
 
 const NON_ERROR: ErrorLike = {
   name: "",
   stack: "",
   message: "",
 };
+
+export function printErr(msg: string) {
+  subPrintErr(`widget: ${msg}`)
+}
+
+export function print(msg: string) {
+  subPrint(`widget: ${msg}`)
+}
 
 async function addAdjacentCodeNotebook(widgetId: string) {
   const selection = figma.getNodeById(widgetId);

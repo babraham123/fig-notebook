@@ -1,3 +1,13 @@
+import { print as subPrint, printErr as subPrintErr } from '../../shared/utils';
+
+export function printErr(msg: string) {
+  subPrintErr(`iframe ${import.meta.env.VITE_TARGET}: ${msg}`)
+}
+
+export function print(msg: string) {
+  subPrint(`iframe ${import.meta.env.VITE_TARGET}: ${msg}`)
+}
+
 /**
  * Right now, since hidden iframes don't do layout, we can only check for SVG
  * elements inside.

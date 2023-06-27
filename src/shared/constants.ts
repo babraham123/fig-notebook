@@ -1,10 +1,17 @@
 // Used by both widget and iframe modules
 
-import { Obj, AppState, Code, Result } from './types'
+import { Obj, AppState, Code, CommandType, Result } from './types'
 import manifest from '../../manifest.json';
 
 export const PLUGIN_ID = '*'; // manifest.id;
 // TODO: swap for more security
+
+// import.meta.env.VITE_TARGET
+export const SUPPORTED_MSGS: Record<string, CommandType[]> = {
+  editor: ['INITIATE', 'RUN', 'FORMAT', 'TEST', 'QUERY', 'SAVE', 'CLOSE'],
+  run: ['INITIATE', 'RUN', 'TEST'],
+  widget: ['INITIATE', 'RUN', 'QUERY', 'SAVE', 'CLOSE'],
+};
 
 export const EMPTY_OBJ: Obj = {
   type: 'UNDEFINED',

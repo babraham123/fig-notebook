@@ -1,27 +1,72 @@
 // Widget UI constants
 
-export const iconsSrc = {
-edit: `
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M52.524,23.925L12.507,0.824c-1.907-1.1-4.376-1.097-6.276,0C4.293,1.94,3.088,4.025,3.088,6.264v46.205
-  c0,2.24,1.204,4.325,3.131,5.435c0.953,0.555,2.042,0.848,3.149,0.848c1.104,0,2.192-0.292,3.141-0.843l40.017-23.103
-  c1.936-1.119,3.138-3.203,3.138-5.439C55.663,27.134,54.462,25.05,52.524,23.925z M49.524,29.612L9.504,52.716
-  c-0.082,0.047-0.18,0.052-0.279-0.005c-0.084-0.049-0.137-0.142-0.137-0.242V6.263c0-0.1,0.052-0.192,0.14-0.243
-  c0.042-0.025,0.09-0.038,0.139-0.038c0.051,0,0.099,0.013,0.142,0.038l40.01,23.098c0.089,0.052,0.145,0.147,0.145,0.249
-  C49.663,29.47,49.611,29.561,49.524,29.612z" fill="white"/>
-  </svg>
-`,
-play: `
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M328.883,89.125l107.59,107.589l-272.34,272.34L56.604,361.465L328.883,89.125z M518.113,63.177l-47.981-47.981
-  c-18.543-18.543-48.653-18.543-67.259,0l-45.961,45.961l107.59,107.59l53.611-53.611
-  C532.495,100.753,532.495,77.559,518.113,63.177z M0.3,512.69c-1.958,8.812,5.998,16.708,14.811,14.565l119.891-29.069
-  L27.473,390.597L0.3,512.69z" fill="white"/>
-  </svg>
-`,
-pause: `
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M352,432H304a16,16,0,0,1-16-16V96a16,16,0,0,1,16-16h48a16,16,0,0,1,16,16V416A16,16,0,0,1,352,432Z" fill="white"/>
-  </svg>
-`
+export const metrics = {
+  toolbarPadding: 8,
+  padding: 16,
+  framePadding: 32,
+  buttonPadding: { horizontal: 12, vertical: 8 },
+  headerPadding: {
+    left: 16,
+    right: 16,
+    top: 16,
+  },
+
+  detailPadding: { horizontal: 16, vertical: 8 },
+
+  width: 720,
+  widthName: 300,
+
+  cornerRadius: 8,
+  resultSpacing: 64,
+
+  importDotsWidth: 6,
+};
+
+export const colors = {
+  bg: "#fcf6e5",
+  bgDark: "#2f2746",
+  bgDetail: "#ffffff",
+  bgError: "#a93218",
+
+  text: "#5c6d73",
+  textDark: "#fdfdfd",
+  textDetail: "#0d0d0d",
+  textButton: "#ffffff",
+  textSecondary: "#7f7f7f",
+
+  placeholder: "#5ba29c",
+  stroke: "#B1D3D0",
+
+  error: "#F24822",
+  disabled: "#E5E5E5",
+
+  separator: "#E5E5E5",
+
+  play: "#00B268",
+  pause: "#F24822",
+  edit: "#0D99FF",
+};
+
+export interface BadgeStyle {
+  fill: WidgetJSX.Color | string;
+  textFill: WidgetJSX.Color | string;
+}
+
+export const badges = {
+  success: <BadgeStyle>{
+    fill: { r: 27 / 255, g: 196 / 255, b: 125 / 255, a: 0.16 },
+    textFill: "#00B268",
+  },
+  error: <BadgeStyle>{
+    fill: { r: 169 / 255, g: 50 / 255, b: 24 / 255, a: 0.16 },
+    textFill: "#F24822",
+  },
+  running: <BadgeStyle>{
+    fill: { r: 24 / 255, g: 160 / 255, b: 251 / 255, a: 0.16 },
+    textFill: "#0D99FF",
+  },
+  editing: <BadgeStyle>{
+    fill: { r: 252 / 255, g: 186 / 255, b: 3 / 255, a: 0.16 },
+    textFill: "#FCBA03",
+  },
 };

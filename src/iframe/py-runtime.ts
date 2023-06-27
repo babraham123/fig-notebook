@@ -1,4 +1,5 @@
 import { Obj } from '../shared/types';
+import { printErr } from './utils';
 import { EMPTY_OBJ } from '../shared/constants';
 
 // Pyodide
@@ -8,7 +9,7 @@ export async function runPYScript(
     code: string,
     inputs: Obj[],
   ): Promise<Obj> {
-    console.error('TODO: Implement');
+    printErr('TODO: Implement');
     return EMPTY_OBJ;
 
   // Will also need custom bundling to preload cython dependent libraries (numpy, etc) and use
@@ -28,7 +29,7 @@ export async function testPYScript(
   code: string,
   testCode: string,
 ): Promise<Obj> {
-  console.error('TODO: Implement');
+  printErr('TODO: Implement');
   return EMPTY_OBJ;
 
   // Will also need custom bundling to preload cython dependent libraries (numpy, etc) and use
@@ -50,7 +51,7 @@ export async function testPYScript(
 }
 
 export function formatPYScript(code: string): string {
-  console.error('TODO: Implement');
+  printErr('TODO: Implement');
   return code;
 
   // TODO: use https://github.com/psf/black

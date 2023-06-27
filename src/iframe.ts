@@ -1,6 +1,7 @@
 import { handleMessage } from './iframe/messages';
 import { EMPTY_OBJ, PLUGIN_ID } from './shared/constants';
 import { setupEditor } from './iframe/editor/main';
+import { printErr } from './widget/utils';
 
 function setupHeadlessRunner() {
   window.onmessage = (event: MessageEvent) => {
@@ -21,5 +22,5 @@ switch (import.meta.env.VITE_TARGET) {
     setupHeadlessRunner();
     break;
   default:
-    console.error(`Unknown build target '${import.meta.env.VITE_TARGET}'`);
+    printErr(`Unknown build target '${import.meta.env.VITE_TARGET}'`);
 }

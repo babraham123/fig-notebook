@@ -48,3 +48,14 @@
 .Resizer.disabled:hover {
   border-color: transparent;
 }
+
+button.play {
+  background-color: lightblue;
+}
+button.format {
+  background-color: lightyellow;
+  margin-left: 8;
+}
+button.save {
+  background-color: green;
+}

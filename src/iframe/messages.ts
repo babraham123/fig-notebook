@@ -5,14 +5,9 @@ import * as std from './std';
 import { runJSScript, testJSScript, formatJSScript } from './js-runtime';
 import { runPYScript, testPYScript, formatPYScript } from './py-runtime';
 import { runWasmScript } from './wasm-runtime';
-import { PLUGIN_ID } from '../shared/constants';
+import { PLUGIN_ID, SUPPORTED_MSGS } from '../shared/constants';
 import { IFrameMessage, CommandType, Obj } from '../shared/types';
-
-// import.meta.env.VITE_TARGET
-const SUPPORTED_MSGS: Record<string, CommandType[]> = {
-  editor: ['INITIATE', 'RUN', 'FORMAT', 'TEST', 'QUERY', 'SAVE', 'CLOSE'],
-  run: ['INITIATE', 'RUN', 'TEST'],
-};
+import { print, printErr } from './utils';
 
 // Handlers return the msg that will be sent back to the widget. Type undefined
 // will be ignored.
@@ -38,7 +33,7 @@ function newError(err: any, type: CommandType, inputsHash: string, codeHash: str
 }
 
 async function unsupportedHandler(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
-  console.error(`In iframe ${import.meta.env.VITE_TARGET} command ${msg.type} is unsupported`);
+  printErr(`Command ${msg.type} is unsupported`);
   return undefined;
 }
 
@@ -116,7 +111,7 @@ async function testHandler(msg: IFrameMessage): Promise<IFrameMessage | undefine
         );
         break;
       case 'wasm':
-        console.error('Ignore: wasm cannot be tested');
+        printErr('Ignore test cmd: wasm cannot be tested');
         break;
       default:
         return newError(`Unsupported language: ${msg.code.language}`, 'TEST', '', '');
@@ -148,7 +143,7 @@ async function formatHandler(msg: IFrameMessage): Promise<IFrameMessage | undefi
         formattedTestCode = formatPYScript(msg.code?.testCode ?? '');
         break;
       case 'wasm':
-        console.error('Ignore: wasm cannot be formatted');
+        printErr('Ignore format cmd: wasm cannot be formatted');
         break;
       default:
         return newError(`Unsupported language: ${msg.code.language}`, 'FORMAT', '', '');
@@ -163,8 +158,13 @@ async function formatHandler(msg: IFrameMessage): Promise<IFrameMessage | undefi
   }
 }
 
+// Do some processing and then return the result to the React component. Response msg is
+// used by the UI code in the editor and ignored in the headless runner.
 export async function handleMessage(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
   if (msg.type in SUPPORTED_MSGS[import.meta.env.VITE_TARGET]) {
+    if (msg.debug) {
+      print(`msg ${msg.type} debug: ${msg.debug}`);
+    }
     const resp = await HANDLERS[msg.type](msg);
     if (resp) {
       parent.postMessage(resp, PLUGIN_ID);

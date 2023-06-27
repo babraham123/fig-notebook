@@ -18,6 +18,7 @@ import {
   DEFAULT_RESULT,
   EMPTY_OBJ,
 } from "../../shared/constants";
+import { print } from '../utils';
 import {
   AppState,
   Obj,
@@ -27,9 +28,6 @@ import {
   Result,
 } from "../../shared/types";
 import { handleMessage } from "../messages";
-
-import { Button } from "@modulz/design-system/components/Button";
-import { Tooltip } from "@modulz/design-system/components/Tooltip";
 
 import "./editor-app.css";
 
@@ -80,7 +78,7 @@ function EditorApp(props: EditorAppProps) {
   }, [appState, code]);
 
   const handleOnSave = useCallback(() => {
-    console.log("try to save");
+    print("try to save");
     const saveMsg: IFrameMessage = {
       type: "SAVE",
       appState,
@@ -92,7 +90,7 @@ function EditorApp(props: EditorAppProps) {
   }, [appState, code]);
 
   const handleOnRun = useCallback(() => {
-    console.log("try to run");
+    print("try to run");
     const runMsg: IFrameMessage = {
       type: "RUN",
       code,
@@ -125,7 +123,7 @@ function EditorApp(props: EditorAppProps) {
   // Callback that calls monaco editor ref autoformatter
   // Currently does not work :(
   const handleAutoFormat = useCallback(() => {
-    console.log("try to format");
+    print("try to format");
     if (editorRef.current) {
       editorRef.current.getAction("editor.action.formatDocument").run();
     }
@@ -142,7 +140,7 @@ function EditorApp(props: EditorAppProps) {
       //     label: "Run code",
       //     keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       //     run(edt: editor.IStandaloneCodeEditor) {
-      //       console.log("Running from editor");
+      //       print("Running from editor");
       //       try {
       //         const maybeModel = edt.getModel();
       //         if (maybeModel) {
@@ -156,7 +154,7 @@ function EditorApp(props: EditorAppProps) {
       //         }
       //       } catch (e) {
       //         console.warn("Something went wrong while trying to get code value");
-      //         console.error(e);
+      //         printErr(e);
       //       }
       //     },
       //   };
@@ -214,25 +212,16 @@ function EditorApp(props: EditorAppProps) {
       </div>
 
       <div style={{ marginLeft: 10, width: "100%", marginTop: 12 }}>
-        <Tooltip content="cmd + enter">
-          <Button
-            onClick={() => {
-              handleOnRun();
-            }}
-            variant="green"
-          >
-            Play
-          </Button>
-        </Tooltip>
-        <Button style={{ marginLeft: 8 }} onClick={handleAutoFormat}>
+        <button type="button" className="play" onClick={handleOnRun}>
+          Play
+        </button>
+        <button type="button" className="format" onClick={handleAutoFormat}>
           Tidy
-        </Button>
-        <Button style={{ marginLeft: 8 }} onClick={() => {
-          handleOnSave();
-        }}>
+        </button>
+        <button type="button" className="save" onClick={handleOnSave}>
           {" "}
           {hasUnsavedChanges ? "Save (unsaved changes)" : "Close"}
-        </Button>
+        </button>
 
         {/* <div style={{ float: "right", marginRight: 20 }}>
           <Button
@@ -318,7 +307,7 @@ const AppContainer: React.FC<{}> = () => {
         } else if (msg.type === 'TEST') {
           setTestOutput(resp.result?.output ?? EMPTY_OBJ);
         } else {
-          console.log(`Message type ${msg.type}, status ${msg.status}`);
+          print(`Message type ${msg.type}, status ${msg.status}`);
         }
       },
       false

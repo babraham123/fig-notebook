@@ -11,192 +11,196 @@ import {
   buildConnectors,
   parseImportStatementsFromCode,
   hashNodeIdToColorWithOpacity,
+  print,
+  printErr,
 } from "./utils";
+import { metrics, colors } from "./tokens";
+import { Badge } from "./components/Badge";
+import { Button } from "./components/Button";
+import { icons } from "../shared/icons";
+import {
+  EMPTY_OBJ,
+  DEFAULT_CODE,
+  DEFAULT_RESULT,
+  SUPPORTED_MSGS,
+} from "../shared/constants";
+import { ObjType, IFrameMessage, Code, Result, CommandType } from "../shared/types";
 
+type IFrameStatus = "UNINITIALIZED" | "IDLE" | "RUNNING" | "EDITING";
+type ResultStatus = "EMPTY" | "SUCCESS" | "ERROR";
 
-import { EMPTY_OBJ, DEFAULT_CODE, DEFAULT_RESULT } from "../shared/constants";
-import { ObjType, IFrameMessage, Code, Result } from "../shared/types";
+const { AutoLayout, Text, Rectangle, useSyncedState, useWidgetId, useEffect } = figma.widget;
 
-type PropertyType = "EDIT" | "RUN" | "STOP";
+async function unsupportedHandler(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
+  printErr(`In widget, command ${msg.type} is unsupported`);
+  return undefined;
+}
 
-const { AutoLayout, Input, Text, Rectangle, SVG, Ellipse } = figma.widget;
-const { usePropertyMenu, useSyncedState, useWidgetId } = figma.widget;
+async function ignoreHandler(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
+  return undefined;
+}
 
 function Widget() {
   const widgetId = useWidgetId();
 
-  const [code, setCode] = useSyncedState<Code>("code", DEFAULT_CODE);
-  const [running, setRunning] = useSyncedState("running", false);
-  const [result, setResult] = useSyncedState<Result>("result", DEFAULT_RESULT);
-  const [inputNodeIds, setInputNodeIds] = useSyncedState<string[]>("inputNodeIds", []);
+  const [title, setTitle] = useSyncedState<string>("title", "untitled");
+  // const [inputNodeIds, setInputNodeIds] = useSyncedState<string[]>("inputNodeIds", []);
+  const [iframeStatus, setIFrameStatus] = useSyncedState("iframeStatus", "UNINITIALIZED"); // How to prevent editing on close?
+  const [resultStatus, setResultStatus] = useSyncedState("resultStatus", "EMPTY");
 
-  function handleMsg(msg: IFrameMessage, resolveFunc: () => void) {
-    if (msg?.status) {
-      console.log(`iframe status: ${msg.status}`);
+  const HANDLERS: Record<CommandType, (msg: IFrameMessage) => Promise<IFrameMessage | undefined>> = {
+    INITIATE: isReadyHandler,
+    RUN: saveHandler,
+    FORMAT: unsupportedHandler,
+    TEST: unsupportedHandler,
+    QUERY: queryHandler,
+    SAVE: saveHandler,
+    CLOSE: closeHandler,
+  };
+
+  // Modifies the React component. Response msg is sent to both the headless runner and
+  // the editor, if present.
+  async function handleMessage(msg: IFrameMessage): Promise<void> {
+    if (msg.type in SUPPORTED_MSGS['widget']) {
+      if (msg.debug) {
+        print(`msg ${msg.type} debug: ${msg.debug}`);
+      }
+      const resp = await HANDLERS[msg.type](msg);
+      if (resp) {
+        figma.ui.postMessage(resp);
+      }
+    } else {
+      await unsupportedHandler(msg);
     }
-    if (msg?.command) {
-      console.error(`Incorrectly sent a command from iframe: ${msg.command}`);
-    }
+  }
+
+  function addMsgListener() {
+    window.addEventListener(
+      "message",
+      async (event: MessageEvent<any>) => {
+        if (!event?.data?.type) {
+          return;
+        }
+        const msg = event.data as IFrameMessage;
+        await handleMessage(msg);
+      },
+      false
+    );
+  }
+
+  function isReadyHandler(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
+    setIFrameStatus("IDLE");
+    return undefined;
+  }
+
+  function saveHandler(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
     if (msg?.code) {
-      setCode(msg.code);
+      // TODO: save
     }
-    if (msg?.inputs) {
-      console.error(`Incorrectly sent inputs from iframe: ${msg.inputs[0].type}`);
+    if (msg?.appState) {
+      // TODO: save
+      setTitle(msg.appState.title);
     }
     if (msg?.result) {
-      setResult(msg.result);
-      setRunning(false);
-      // figma.notify("Notebook error: " + errorLike.message);
-      resolveFunc();
+      // TODO: save
+      if (msg.result.output.type === "ERROR") {
+        setResultStatus("ERROR");
+        // figma.notify("Notebook error: " + errorLike.message);
+      } else {
+        setResultStatus("SUCCESS");
+      }
     }
+    return undefined;
+  }
+
+  function queryHandler(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
+    if (msg?.nodes) {
+      printErr(`Incorrectly sent nodes from iframe: ${msg.nodes.length}`);
+    }
+    let serializedNodes: any[] = [];
     if (msg?.nodeQuery) {
       const {selector, id} = msg.nodeQuery;
       const rootNode = !id ? figma.currentPage : figma.getNodeById(id);
       const nodes = FigmaSelector.parse(selector, rootNode);
-      const serializedNodes = nodes.map((node) => serializeNode(node));
-      figma.ui.postMessage({
-        nodes: serializedNodes,
-      });
+      serializedNodes = nodes.map((node) => serializeNode(node));
     }
-    if (msg?.nodes) {
-      console.error(`Incorrectly sent nodes from iframe: ${msg.nodes.length}`);
-    }
-    if (msg?.debug) {
-      console.log(msg.debug);
-    }
-  }
-
-  function handlePropertyMenu({ propertyName }: { propertyName: PropertyType }): Promise<void> {
-    if (propertyName === "STOP") {
-      setRunning(false);
-      figma.ui.close();
-      figma.closePlugin();
-      return;
-    }
-
-    return new Promise<void>((resolve) => {
-      figma.ui.close();
-      figma.ui.onmessage = (msg) => {
-        if (msg.status === "READY") {
-          // Only send code after we're ready.
-          setRunning(true);
-          setLastRanBy(figma.currentUser.name);
-
-          // collect inputs
-
-          // Send commands
-          if (propertyName === "RUN") {
-            figma.ui.postMessage({ command: "RUN", code, inputs });
-          }
-        }
-        // handle responses
-        handleMsg(msg, resolve);
-      };
-
-      // Display results
-      let htmlStr = "";
-      let visible = false;
-      // size = [undefined, undefined];  // fullscreen?
-      if (propertyName === "EDIT") {
-        htmlStr = __uiFiles__.edit;
-        visible = true;
-      } else if (propertyName === "RUN") {
-        htmlStr = __uiFiles__.run;
-      }
-
-      figma.showUI(htmlStr, {
-        visible,
-        title: "Program module",
-      });
+    return Promise.resolve({
+      type: "QUERY",
+      nodeQuery: msg.nodeQuery,
+      nodes: serializedNodes,
     });
   }
 
-  usePropertyMenu(
-    [
-      {
-        itemType: "action",
-        propertyName: !running ? "RUN" : "STOP",
-        tooltip: !running ? "Run code" : "Stop execution",
-        icon: !running ? icons.play : icons.stop,
-      },
-      {
-        itemType: "action",
-        propertyName: "EDIT",
-        tooltip: "Edit",
-      },
-    ],
-    handlePropertyMenu
-  );
+  function closeHandler(msg: IFrameMessage): Promise<IFrameMessage | undefined> {
+    closeIFrame();
+    return undefined;
+  }
+
+  function closeIFrame(): void {
+    figma.ui.close();
+    figma.closePlugin();
+    setIFrameStatus("UNINITIALIZED");
+  }
+
+  function handleEditBtn(): void {
+    setIFrameStatus("EDITING");
+    addMsgListener();
+    figma.showUI(__uiFiles__.edit, {
+      visible: true,
+      title: "Code editor",
+    });
+  }
+
+  function handlePlayBtn(): void {
+    setIFrameStatus("RUNNING");
+    addMsgListener();
+    figma.showUI(__uiFiles__.run, {
+      visible: false,
+      title: "Code runner",
+    });
+  }
 
   return (
     <AutoLayout
       direction="vertical"
       cornerRadius={metrics.cornerRadius}
       fill={colors.bg}
-      effect={shadows}
       stroke={colors.stroke}
       strokeWidth={1}
     >
-      {Boolean(
-        lastEditedBy ||
-          <Rectangle width={1} height={metrics.padding} />}
-      {Boolean(lastRanBy) && (
-        <AutoLayout
-          padding={metrics.detailPadding}
-          fill={colors.bgDetail}
-          width={metrics.width}
-          verticalAlignItems="center"
-          spacing={metrics.padding}
-        >
-          <Text fill={colors.textDetail}>{`Last ran by ${lastRanBy}`}</Text>
-          <Rectangle width="fill-parent" height={1} />
-          {running && <Badge style={badges.running}>Running</Badge>}
-          {!running && !hasError && (
-            <Badge style={badges.successful}>Successful</Badge>
-          )}
-          {!running && hasError && (
-            <Button
-              style={toggleError ? buttons.errorOpen : buttons.error}
-              onClick={handleToggleError}
-            >
-              {toggleError ? "Hide error" : "Show error"}
-            </Button>
-          )}
-          <AutoLayout
-            fill={colors.bgDetail}
-            verticalAlignItems="center"
-            spacing={metrics.unitTestSpacing}
-          >
-            <SVG
-              src={icons.add.replace(
-                /white/g,
-                colors.textDetail
-              )}
-              onClick={() => {
-                addUnitTest()
-              }}
-              tooltip={"Add test case"}
-            />
-            <SVG
-              src={(!running ? icons.play : icons.stop).replace(
-                /white/g,
-                colors.textDetail
-              )}
-              onClick={() =>
-                handlePropertyMenu({
-                  propertyName: running ? "stopExecution" : "runCode",
-                })
-              }
-              tooltip={!running ? "Run code" : "Stop execution"}
-            />
-          </AutoLayout>
-        </AutoLayout>
-      )}
-      {hasError && toggleError && (
-        <AutoLayout padding={metrics.padding} fill={colors.bgError}>
-          <ErrorStack error={lastRanError} />
-        </AutoLayout>
-      )}
+      <AutoLayout
+        padding={metrics.detailPadding}
+        fill={colors.bgDetail}
+        width={metrics.width}
+        verticalAlignItems="center"
+        spacing={metrics.padding}
+      >
+        <Text fontSize={32} horizontalAlignText="center">{title}</Text>
+        <Rectangle width="fill-parent" height={1} />
+        <Button
+          name="edit"
+          onClick={handleEditBtn}
+          enabled={["UNINITIALIZED", "IDLE"].includes(iframeStatus)}
+        ></Button>
+        <Button
+          name="play"
+          onClick={handlePlayBtn}
+          enabled={["UNINITIALIZED", "IDLE", "EDITING"].includes(iframeStatus)}
+        ></Button>
+        <Button
+          name="pause"
+          onClick={closeIFrame}
+          enabled={iframeStatus === "RUNNING"}
+        ></Button>
+        {
+          ["RUNNING", "EDITING"].includes(iframeStatus) &&
+          <Badge name={iframeStatus.toLowerCase()}></Badge>
+        }
+        {
+          ["SUCCESS", "ERROR"].includes(resultStatus) &&
+          <Badge name={resultStatus.toLowerCase()}></Badge>
+        }
+      </AutoLayout>
     </AutoLayout>
   );
 }
