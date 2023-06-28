@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { cssModulesPlugin } from "./build/vendor/css-module-plugin.mjs";
+// import commonjs from "@rollup/plugin-commonjs";
 
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -11,7 +12,7 @@ const config = defineConfig({
     outDir: "../dist/" + process.env.VITE_TARGET,
     emptyOutDir: true,
   },
-  plugins: [viteSingleFile(), cssModulesPlugin()],
+  plugins: [viteSingleFile(), cssModulesPlugin()], //, commonjs()],
   resolve: {
     alias: {},
   },
